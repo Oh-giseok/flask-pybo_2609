@@ -3,6 +3,7 @@ from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 
 import config
+# from pybo.views import answer_views
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -19,7 +20,9 @@ def create_app():
     from . import models
 
     # 블루프린트 등록
-    from .views import main_views
+    from .views import main_views, question_views, answer_views
     app.register_blueprint(main_views.bp)
+    app.register_blueprint(question_views.bp)
+    app.register_blueprint(answer_views.bp)
 
     return app
