@@ -18,6 +18,5 @@ def insert_test_data(n):
         db.session.commit()
         print(f'{n}개의 테스트 데이터 생성')
 
-
 if __name__ == '__main__':
     insert_test_data(300)
