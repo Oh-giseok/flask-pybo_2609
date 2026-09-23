@@ -3,19 +3,20 @@
 {% block content %}
 <div class="container">
     <h5 class="my-3 border-bottom pb-2">질문 등록</h5>
-    <form method="post" class="my-3" novalidate>
+    <form method="post" class="my-3" novalidate enctype="multipart/form-data">
         <!-- 브라우저에 있는 csrf_token 확인 -->
         {{ form.csrf_token }}
-        <!-- 오류 표시 Start -->
-        {% if form.errors %}
         {% include 'form_errors.html' %}
-        {% endif %}
-        <!-- 오류 표시 End -->
+
         {{ form.subject.label }}
         {{ form.subject(class='form-control mb-3') }}
 
         {{ form.content.label }} <!-- <label for="">내용</label>> -->
-        {{ form.content(class='form-control', rows='5') }} <!-- <textarea></textarea>> -->
+        {{ form.content(class='form-control mb-3', rows='5') }} <!-- <textarea></textarea>> -->
+
+        {{ form.image.label }}
+        {{ form.image(class='form-control') }}
+
         {{ form.submit(class='btn btn-primary my-3') }}
     </form>
 </div>

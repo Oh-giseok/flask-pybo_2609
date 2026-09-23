@@ -1,15 +1,17 @@
 from flask_wtf import FlaskForm
-from wtforms.fields.simple import StringField, TextAreaField, SubmitField, PasswordField, EmailField
+from flask_wtf.file import FileField, file_allowed, FileAllowed
+from wtforms.fields.simple import StringField, TextAreaField, SubmitField, PasswordField, EmailField, FileField
 from wtforms.validators import DataRequired, Length, EqualTo, Email
 
 
 class QuestionForm(FlaskForm):
     subject = StringField('제목', validators=[DataRequired('제목은 필수 입력 항목입니다.')])
     content = TextAreaField('내용', validators=[DataRequired('내용은 필수 입력 항목입니다.')])
+    image = FileField('이미지 업로드', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif'], '이미지 파일만 업로드 가능합니다.')])
     submit = SubmitField('저장하기')
 
 class AnswerForm(FlaskForm):
-    content = TextAreaField('내용', validators=[DataRequired('내용은 필수 입력 항목입니다.')])
+    content = TextAreaField('답변내용', validators=[DataRequired('내용은 필수 입력 항목입니다.')])
     submit = SubmitField('답변 등록')
 
 class UserCreateForm(FlaskForm):

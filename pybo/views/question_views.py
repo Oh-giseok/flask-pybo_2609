@@ -1,21 +1,54 @@
+import os
 from datetime import datetime
+from fileinput import filename
 
-from flask import Blueprint, render_template, request, redirect, url_for, g
+from flask import Blueprint, render_template, request, redirect, url_for, g, flash, current_app
+from werkzeug.utils import secure_filename
 
 from pybo import db
 from pybo.forms import QuestionForm, AnswerForm
-from pybo.models import Question
-from pybo. views.auth_views import login, login_required
+from pybo.models import Question, Answer, User
+from pybo.views.auth_views import login, login_required
 
 bp = Blueprint('question', __name__, url_prefix='/question')
 
 @bp.route('/list')
 def _list():
-    page = request.args.get('page', default=1, type=int) # url parameter ? page=1
-    question_list = Question.query.order_by(Question.create_date.desc())
-    question_list = question_list.paginate(page=page, per_page=10) # 페이징 구현
+    page = request.args.get('page', default=1, type=int)
+    kw = request.args.get('kw', default='', type=str)
 
-    return render_template('question/question_list.html', question_list=question_list)
+    question_list = Question.query.order_by(Question.create_date.desc())
+
+    if kw:
+        search = '%{}%'.format(kw)
+
+        sub_query = db.session.query(
+            Answer.question_id,
+            Answer.content,
+            User.username
+        ).join(
+            User, Answer.user_id == User.id
+        ).subquery()
+
+        question_list = question_list.join(User).outerjoin(
+            sub_query,
+            sub_query.c.question_id == Question.id
+        ).filter(
+            Question.subject.ilike(search) |
+            Question.content.ilike(search) |
+            User.username.ilike(search) |
+            sub_query.c.content.ilike(search) |
+            sub_query.c.username.ilike(search)
+        ).distinct()
+
+    question_list = question_list.paginate(page=page, per_page=10)
+
+    return render_template(
+        'question/question_list.html',
+        question_list=question_list,
+        page=page,
+        kw=kw
+    )
 
 @bp.route('/detail/<int:question_id>')
 def detail(question_id):
@@ -28,8 +61,64 @@ def detail(question_id):
 def create():
     form = QuestionForm()
     if request.method == 'POST' and form.validate_on_submit():
-        question = Question(subject=form.subject.data, content=form.content.data, create_date=datetime.now(), user=g.user)
+        # 폼에서 전송된 이미지 파일
+        image_file = form.image.data
+        image_path = None
+        print('이미지 파일:', image_file)
+        print('파일명:', image_file.filename if image_file else None)
+
+        if image_file:
+            # 저장 경로 : 오늘 날짜로 폴더 생성
+            today = datetime.now().strftime('%Y%m%d')
+            upload_folder = os.path.join(current_app.root_path, 'static/photo', today)
+            os.makedirs(upload_folder, exist_ok=True)
+
+            # 파일 저장
+            filename = secure_filename(image_file.filename)
+            file_path = os.path.join(upload_folder, filename)
+            image_file.save(file_path)
+
+            # DB에 저장할 경로(static 기준 상대경로)
+            image_path = f'photo/{today}/{filename}'
+
+        question = Question(
+            subject=form.subject.data,
+            content=form.content.data,
+            create_date=datetime.now(),
+            user=g.user,
+            image_path=image_path # 이미지 경로 저장
+        )
         db.session.add(question)
         db.session.commit()
         return redirect(url_for('main.index'))
     return render_template('question/question_form.html', form=form)
+
+@bp.route('/modify/<int:question_id>', methods=['GET', 'POST'])
+@login_required
+def modify(question_id):
+    question = Question.query.get_or_404(question_id)
+    if g.user != question.user:
+        flash('수정 권한이 없습니다.')
+        return redirect(url_for('question.detail', question_id=question_id))
+    if request.method == 'POST': # POST 요청
+        form = QuestionForm()
+        if form.validate_on_submit():
+            form.populate_obj(question)
+            question.modify_date = datetime.now() # 수정한 일시 저장
+            db.session.commit()
+            return redirect(url_for('question.detail', question_id=question.id))
+    else: # GET 요청
+        form = QuestionForm(obj = question)
+
+    return render_template('question/question_form.html', form=form)
+
+@bp.route('/delete/<int:question_id>')
+@login_required
+def delete(question_id):
+    question = Question.query.get_or_404(question_id)
+    if g.user != question.user:
+        flash('삭제 권한이 없습니다.')
+        return redirect(url_for('question.detail', question_id=question_id))
+    db.session.delete(question)
+    db.session.commit()
+    return redirect(url_for('question._list'))
